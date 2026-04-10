@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我们的恋爱日记</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #ffe6ea, #fff0f5);
+            font-family: "Arial", "Microsoft YaHei", sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .title {
+            color: #ff5e87;
+            text-align: center;
+            font-size: 28px;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 15px 0;
+            box-shadow: 0 4px 15px rgba(255, 94, 135, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+        
+        textarea {
+            width: 100%;
+            height: 120px;
+            border: 2px solid #ffb6c1;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 16px;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        
+        button, .btn {
+            background: linear-gradient(45deg, #ff5e87, #ff4081);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover, .btn:hover {
+            background: linear-gradient(45deg, #ff4081, #e91e63);
+            transform: scale(1.05);
+        }
+        
+        .img-preview {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+            display: none;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px dashed #ffb6c1;
+            border-radius: 10px;
+        }
+        
+        .diary-date {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .diary-content {
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        /* 生日祝福弹窗 */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+            animation: popup 0.5s ease;
+        }
+        
+        @keyframes popup {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .modal h2 {
+            color: #ff5e87;
+            margin-bottom: 15px;
+        }
+        
+        .modal p {
+            color: #666;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        
+        .love-days {
+            font-size: 36px;
+            color: #ff4081;
+            font-weight: bold;
+            margin: 15px 0;
+            animation: heartbeat 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        hr {
+            border: none;
+            height: 1px;
+            background: linear-gradient(to right, transparent, #ffb6c1, transparent);
+            margin: 20px 0;
+        }
+        
+        .emoji {
+            font-size: 24px;
+            margin: 0 5px;
+        }
+        
+        .delete-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+        
+        .delete-btn:hover {
+            background: #ff5252;
+            transform: scale(1.1);
+        }
+        
+        .diary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .no-diary {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        
+        .sync-status {
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .diary-image {
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <!-- 生日祝福与恋爱天数弹窗 -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2><span class="emoji">🎂</span> 亲爱的，生日快乐！ <span class="emoji">🎂</span></h2>
+            <p>愿你的每一天都充满阳光、笑容与爱。</p>
+            <p>感谢命运让我遇见你，这是我生命中最美的礼物。</p>
+            <hr>
+            <h3><span class="emoji">💕</span> 我们的恋爱里程碑</h3>
+            <p>我们从 <strong>2026年4月5日</strong> 走到今天，已经一起度过了：</p>
+            <div class="love-days" id="loveDays">{{ love_days }}</div>
+            <p>个日夜 <span class="emoji">💖</span></p>
+            <p>未来，还有无数个明天在等待我们共同书写。</p>
+            <div class="status-badge">云端同步</div>
+            <br>
+            <button onclick="closeModal()" class="btn">收下祝福，继续写日记</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 class="title"><span class="emoji">💞</span> 我们的恋爱日记 <span class="emoji">💞</span></h1>
+        <div class="sync-status">🌐 云端同步 | 💾 数据自动保存 | 📱 多设备访问</div>
+        
+        <div class="card">
+            <form method="post" enctype="multipart/form-data" onsubmit="return validateForm()">
+                <textarea name="content" id="diaryContent" placeholder="写下今天想对TA说的话..." required></textarea>
+                <input type="file" name="img" id="imgInput" accept="image/*" onchange="previewImage()">
+                <img id="imgPreview" class="img-preview" alt="图片预览">
+                <button type="submit">保存日记</button>
+            </form>
+        </div>
+
+        <h2 style="color: #ff5e87; margin: 20px 0;"><span class="emoji">📖</span> 回忆记录</h2>
+        
+        {% if diaries %}
+            {% for diary in diaries %}
+            <div class="card" id="diary-{{ diary[0] }}">
+                <div class="diary-header">
+                    <div class="diary-date">{{ diary[3] }}</div>
+                    <button class="delete-btn" onclick="deleteDiary({{ diary[0] }})">
+                        删除
+                    </button>
+                </div>
+                <div class="diary-content">{{ diary[1] }}</div>
+                {% if diary[2] %}
+                <img src="{{ diary[2] }}" alt="日记图片" class="diary-image">
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="card no-diary">
+                还没有日记，写下第一句话吧！<br>
+                <small>所有日记都会自动保存到云端</small>
+            </div>
+        {% endif %}
+        
+        <div class="card sync-status">
+            💕 我们的故事已持续 <span id="liveLoveDays">{{ love_days }}</span> 天<br>
+            📅 从 2026年4月5日 开始
+        </div>
+    </div>
+
+    <script>
+        // 图片预览功能
+        function previewImage() {
+            const input = document.getElementById('imgInput');
+            const preview = document.getElementById('imgPreview');
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        
+        // 表单验证
+        function validateForm() {
+            const content = document.getElementById('diaryContent').value.trim();
+            if (!content) {
+                alert('请写下你想说的话！');
+                return false;
+            }
+            return true;
+        }
+        
+        // 如果今天访问过，不再显示弹窗
+        function shouldShowModal() {
+            const lastVisit = localStorage.getItem('lastVisit');
+            const today = new Date().toDateString();
+            
+            if (lastVisit !== today) {
+                localStorage.setItem('lastVisit', today);
+                return true;
+            }
+            return false;
+        }
+        
+        // 页面加载
+        window.onload = function() {
+            // 每天只显示一次弹窗
+            if (shouldShowModal()) {
+                document.getElementById('modal').style.display = 'flex';
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+        
+        // 点击弹窗外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+        
+        // 删除日记功能
+        async function deleteDiary(diaryId) {
+            if (!confirm('确定要删除这篇日记吗？删除后无法恢复！')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/delete/${diaryId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 从页面中移除被删除的日记
+                    const diaryElement = document.getElementById(`diary-${diaryId}`);
+                    if (diaryElement) {
+                        diaryElement.remove();
+                        alert('日记已删除');
+                        
+                        // 如果没有日记了，显示提示
+                        const diaryContainer = document.querySelector('.container');
+                        const diaryCards = diaryContainer.querySelectorAll('.card[id^="diary-"]');
+                        if (diaryCards.length === 0) {
+                            const noDiaryMessage = document.createElement('div');
+                            noDiaryMessage.className = 'card no-diary';
+                            noDiaryMessage.innerHTML = '还没有日记，写下第一句话吧！<br><small>所有日记都会自动保存到云端</small>';
+                            diaryContainer.appendChild(noDiaryMessage);
+                        }
+                    }
+                } else {
+                    alert('删除失败: ' + result.message);
+                }
+            } catch (error) {
+                alert('删除时发生错误: ' + error.message);
+            }
+        }
+        
+        // 自动刷新恋爱天数
+        function updateLoveDays() {
+            fetch('/api/love_days')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('liveLoveDays').textContent = data.love_days;
+                })
+                .catch(error => console.error('更新恋爱天数失败:', error));
+        }
+        
+        // 每分钟更新一次恋爱天数
+        setInterval(updateLoveDays, 60000);
+    </script>
+</body>
+</html>

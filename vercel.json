@@ -1,0 +1,17 @@
+{ 
+  "builds": [ 
+    { 
+      "src": "love.py", 
+      "use": "@vercel/python" 
+    } 
+  ], 
+  "routes": [ 
+    { 
+      "src": "/(.*)", 
+      "dest": "love.py" 
+    } 
+  ], 
+  "env": { 
+    "PYTHON_VERSION": "3.9" 
+  } 
+} 
