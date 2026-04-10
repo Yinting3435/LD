@@ -16,75 +16,80 @@ cloudinary.config(
     api_secret=os.environ.get('CLOUDINARY_API_SECRET', 'demo')
 )
 
-# 数据库连接函数 - 同时支持SQLite和PostgreSQL
+# 数据库连接函数 - 修复版
 def get_db_connection():
     database_url = os.environ.get('DATABASE_URL')
     
-    # 本地开发：如果没有设置DATABASE_URL，使用SQLite
-    if not database_url or database_url.startswith('sqlite'):
-        import sqlite3
-        # 本地开发使用SQLite
-        conn = sqlite3.connect('love_diary.db')
-        return conn
+    # 调试信息
+    print(f"DATABASE_URL exists: {bool(database_url)}")
+    if database_url:
+        print(f"DATABASE_URL value: {database_url[:50]}...")
     
-    # 生产环境：使用PostgreSQL
-    # 修复URL格式（Vercel Postgres使用postgres://，但psycopg2需要postgresql://）
-    if database_url.startswith('postgres://'):
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
-    
-    try:
-        import psycopg2
-        from psycopg2.extras import RealDictCursor
+    # 在Vercel环境中，必须使用PostgreSQL
+    # 只有在本地开发且明确设置了SQLite时才使用SQLite
+    if database_url and database_url.startswith('postgres'):
+        # 修复URL格式（某些服务返回postgres://，但psycopg2需要postgresql://）
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
         
-        # 连接到PostgreSQL
-        conn = psycopg2.connect(
-            database_url,
-            sslmode='require'
-        )
-        return conn
-    except ImportError:
-        # 如果psycopg2没有安装，在本地回退到SQLite
+        try:
+            import psycopg2
+            print("正在使用PostgreSQL连接...")
+            conn = psycopg2.connect(
+                database_url,
+                sslmode='require'
+            )
+            return conn
+        except Exception as e:
+            print(f"PostgreSQL连接失败: {e}")
+            raise Exception(f"无法连接到PostgreSQL数据库: {e}")
+    
+    # 只有在本地开发且没有DATABASE_URL时使用SQLite
+    else:
+        # 检查是否是Vercel环境
+        if os.environ.get('VERCEL'):
+            raise Exception("在Vercel环境中必须配置DATABASE_URL环境变量")
+        
+        # 本地开发使用SQLite
         import sqlite3
-        conn = sqlite3.connect('love_diary.db')
-        return conn
-    except Exception as e:
-        print(f"数据库连接错误: {e}")
-        # 如果PostgreSQL连接失败，在本地回退到SQLite
-        import sqlite3
+        print("本地开发：使用SQLite数据库")
         conn = sqlite3.connect('love_diary.db')
         return conn
 
 # 初始化数据库
 def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    # 尝试PostgreSQL语法
     try:
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS diary (
-                id SERIAL PRIMARY KEY,
-                content TEXT NOT NULL,
-                img_url TEXT,
-                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        conn = get_db_connection()
+        c = conn.cursor()
+        
+        # 检查表是否存在
+        c.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_name = 'diary'
             )
-        ''')
-    except:
-        # 如果失败，尝试SQLite语法
-        try:
+        """)
+        table_exists = c.fetchone()[0]
+        
+        if not table_exists:
+            # 创建表
             c.execute('''
-                CREATE TABLE IF NOT EXISTS diary (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                CREATE TABLE diary (
+                    id SERIAL PRIMARY KEY,
                     content TEXT NOT NULL,
                     img_url TEXT,
                     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
-        except Exception as e:
-            print(f"创建表失败: {e}")
-    
-    conn.commit()
-    conn.close()
+            print("✅ 数据库表已创建")
+        else:
+            print("✅ 数据库表已存在")
+        
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"数据库初始化错误: {e}")
+        # 不抛出异常，允许应用继续运行
 
 # 计算恋爱天数
 def calculate_love_days():
@@ -119,34 +124,31 @@ def index():
                 print(f"图片上传失败: {e}")
                 img_url = None
         
+        try:
+            conn = get_db_connection()
+            c = conn.cursor()
+            
+            # 插入数据
+            c.execute('INSERT INTO diary (content, img_url) VALUES (%s, %s)', 
+                     (content, img_url))
+            
+            conn.commit()
+            conn.close()
+            return redirect(url_for('index'))
+        except Exception as e:
+            return f"保存日记时出错: {e}", 500
+
+    # 读取所有日记
+    try:
         conn = get_db_connection()
         c = conn.cursor()
         
-        # 插入数据 - 使用参数化查询
-        try:
-            c.execute('INSERT INTO diary (content, img_url) VALUES (%s, %s)', 
-                     (content, img_url))
-        except:
-            # 如果上面的语句失败，使用SQLite的参数格式
-            c.execute('INSERT INTO diary (content, img_url) VALUES (?, ?)', 
-                     (content, img_url))
-        
-        conn.commit()
+        c.execute('SELECT id, content, img_url, create_time FROM diary ORDER BY create_time DESC')
+        diaries = c.fetchall()
         conn.close()
-        return redirect(url_for('index'))
-
-    # 读取所有日记
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    try:
-        c.execute('SELECT id, content, img_url, create_time FROM diary ORDER BY create_time DESC')
-    except:
-        # 如果失败，可能是SQLite语法问题
-        c.execute('SELECT id, content, img_url, create_time FROM diary ORDER BY create_time DESC')
-    
-    diaries = c.fetchall()
-    conn.close()
+    except Exception as e:
+        print(f"读取日记时出错: {e}")
+        diaries = []
 
     return render_template('index.html', diaries=diaries, love_days=love_days)
 
@@ -158,11 +160,7 @@ def delete_diary(diary_id):
         c = conn.cursor()
         
         # 首先获取日记信息，包括图片URL
-        try:
-            c.execute('SELECT img_url FROM diary WHERE id = %s', (diary_id,))
-        except:
-            c.execute('SELECT img_url FROM diary WHERE id = ?', (diary_id,))
-        
+        c.execute('SELECT img_url FROM diary WHERE id = %s', (diary_id,))
         result = c.fetchone()
         
         if result:
@@ -177,13 +175,9 @@ def delete_diary(diary_id):
                     print(f"删除Cloudinary图片失败: {e}")
             
             # 从数据库中删除日记
-            try:
-                c.execute('DELETE FROM diary WHERE id = %s', (diary_id,))
-            except:
-                c.execute('DELETE FROM diary WHERE id = ?', (diary_id,))
-            
+            c.execute('DELETE FROM diary WHERE id = %s', (diary_id,))
             conn.commit()
-            
+        
         conn.close()
         return jsonify({'success': True, 'message': '日记删除成功'})
     except Exception as e:
@@ -197,35 +191,35 @@ def api_love_days():
 # 健康检查
 @app.route('/health')
 def health():
-    return 'OK'
-
-# 数据库状态检查
-@app.route('/db-status')
-def db_status():
     try:
         conn = get_db_connection()
         c = conn.cursor()
         c.execute('SELECT 1')
         result = c.fetchone()
         conn.close()
-        return jsonify({
-            'status': 'connected',
-            'database_type': 'PostgreSQL' if os.environ.get('DATABASE_URL') else 'SQLite'
-        })
+        return 'OK - 数据库连接正常'
     except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        return f'ERROR - 数据库连接失败: {e}', 500
+
+# 环境检查路由
+@app.route('/env-check')
+def env_check():
+    env_info = {
+        'DATABASE_URL_exists': bool(os.environ.get('DATABASE_URL')),
+        'CLOUDINARY_CLOUD_NAME_exists': bool(os.environ.get('CLOUDINARY_CLOUD_NAME')),
+        'CLOUDINARY_API_KEY_exists': bool(os.environ.get('CLOUDINARY_API_KEY')),
+        'CLOUDINARY_API_SECRET_exists': bool(os.environ.get('CLOUDINARY_API_SECRET')),
+        'VERCEL_environment': bool(os.environ.get('VERCEL')),
+    }
+    
+    # 安全地显示DATABASE_URL的一部分
+    db_url = os.environ.get('DATABASE_URL', '')
+    if db_url:
+        env_info['DATABASE_URL_prefix'] = db_url[:20] + '...' if len(db_url) > 20 else db_url
+    
+    return jsonify(env_info)
 
 if __name__ == '__main__':
     init_db()
     # 本地+手机都能访问
     app.run(host='0.0.0.0', port=8080, debug=True)
-
-@app.route('/debug-env')
-def debug_env():
-    db_url = os.environ.get('DATABASE_URL')
-    return f"""
-    <h3>环境变量检查</h3>
-    <p>DATABASE_URL 是否存在: {'是' if db_url else '否'}</p>
-    <p>DATABASE_URL 值 (前50字符): {db_url[:50] if db_url else '无'}</p>
-    <p>当前数据库连接类型: {'PostgreSQL (生产环境)' if db_url and not db_url.startswith('sqlite') else 'SQLite (本地开发)'}</p>
-    """
