@@ -219,3 +219,13 @@ if __name__ == '__main__':
     init_db()
     # 本地+手机都能访问
     app.run(host='0.0.0.0', port=8080, debug=True)
+
+@app.route('/debug-env')
+def debug_env():
+    db_url = os.environ.get('DATABASE_URL')
+    return f"""
+    <h3>环境变量检查</h3>
+    <p>DATABASE_URL 是否存在: {'是' if db_url else '否'}</p>
+    <p>DATABASE_URL 值 (前50字符): {db_url[:50] if db_url else '无'}</p>
+    <p>当前数据库连接类型: {'PostgreSQL (生产环境)' if db_url and not db_url.startswith('sqlite') else 'SQLite (本地开发)'}</p>
+    """
